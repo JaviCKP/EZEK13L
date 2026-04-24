@@ -1,36 +1,78 @@
+<div align="center">
+
+<img src="./assets/ezek13l-banner.png" alt="EZEK13L banner" width="100%">
+
 # EZEK13L
 
-**Network Detection & Response — Local Lab**
+### Network Detection & Response — Local Lab
 
-> A proof-of-concept. Synthetic traffic, virtual hosts, no production claims.  
-> What it does demonstrate: a multi-layer detection architecture that reads behaviour, not just signatures.
+<p>
+  <strong>Multi-layer NDR proof-of-concept using Zeek, Suricata, River ML and behavioural heuristics.</strong>
+</p>
 
-[IMAGE: dark terminal screenshot showing the blind test output — all five PASS lines in sequence, clean monospace font on black background]
+<p>
+  <img src="https://img.shields.io/badge/status-proof--of--concept-gold?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Zeek-network%20logs-blue?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Suricata-IDS-red?style=for-the-badge">
+  <img src="https://img.shields.io/badge/River-online%20ML-purple?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Docker-local%20lab-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+</p>
+
+<p>
+  <a href="#the-idea">The idea</a> ·
+  <a href="#quick-results">Results</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#blind-generalization-test">Blind test</a> ·
+  <a href="#limitations">Limitations</a>
+</p>
+
+</div>
 
 ---
 
-## Table of contents
+> A proof-of-concept. Synthetic traffic, virtual hosts, no production claims.  
+> What it demonstrates: a multi-layer detection architecture that reads behaviour, not just signatures.
 
-- [The idea](#the-idea)
-- [How it looks](#how-it-looks)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Architecture](#architecture)
-- [Detection layers](#detection-layers)
-- [Attack families](#attack-families)
-- [Blind Generalization Test](#blind-generalization-test)
-- [Feature engineering](#feature-engineering)
-- [Repository structure](#repository-structure)
-- [Limitations](#limitations)
-- [What comes next](#what-comes-next)
+---
+
+## Quick results
+
+| Scenario | Result | Detection layers |
+|---|---:|---|
+| Benign control | PASS | — |
+| Port Scan | PASS | ML · Expert · Suricata |
+| DNS Exfiltration | PASS | ML · Expert |
+| Brute Force HTTP | PASS | ML · Suricata |
+| SQL Injection | PASS | ML · Expert · Suricata |
+| Data Exfiltration | PASS | Expert |
+
+<div align="center">
+
+<img src="./assets/blind-test-terminal.png" alt="Blind test terminal output" width="850">
+
+<br>
+
+**Blind result: 5/5 attacks detected**
+
+</div>
 
 ---
 
 ## The idea
 
-Most IDS demos stop at Suricata firing on a known payload. EZEK13L goes one layer deeper.
+Most IDS demos stop at Suricata firing on a known payload. **EZEK13L goes one layer deeper.**
 
-It combines signature detection (Suricata), unsupervised anomaly scoring (HalfSpaceTrees), supervised attack classification (centroid-based), and hand-tuned behavioural heuristics — four layers that compensate for each other's blind spots. When one layer misses, another doesn't.
+It combines:
+
+| Layer | Purpose |
+|---|---|
+| **Suricata** | Signature-based detection |
+| **HalfSpaceTrees** | Unsupervised anomaly scoring |
+| **Centroid classifier** | Supervised attack classification |
+| **Expert heuristics** | Behavioural detection signals |
+
+When one layer misses, another can still catch the behaviour.
 
 The blind generalization test at the end of this document shows what that means in practice.
 
@@ -38,7 +80,8 @@ The blind generalization test at the end of this document shows what that means 
 
 ## How it looks
 
-Standard validation (`VALIDACION_POC.md`):
+<details>
+<summary>Standard validation output</summary>
 
 ```
 [PASS] Control benigno    raw=0.920  detections=0   layers=—
@@ -49,7 +92,10 @@ Standard validation (`VALIDACION_POC.md`):
 [FAIL] Data Exfiltration  raw=0.752  detections=0   layers=Expert
 ```
 
-Blind test — different IPs, domains, and payloads, model not retrained (`BLIND_TEST_RESULTS.md`):
+</details>
+
+<details>
+<summary>Blind test output — different IPs, domains, and payloads, model not retrained</summary>
 
 ```
 [PASS] Control benigno       raw=0.920  detections=0   layers=—
@@ -62,7 +108,11 @@ Blind test — different IPs, domains, and payloads, model not retrained (`BLIND
 Blind result: 5/5 attacks detected
 ```
 
-[IMAGE: actual terminal screenshot of validate-blind.ps1 output — monospace, dark background, each PASS line visible]
+</details>
+
+<div align="center">
+  <img src="./assets/blind-test-terminal.png" alt="Blind test terminal output" width="850">
+</div>
 
 ---
 
@@ -111,6 +161,13 @@ docker compose run --rm py python simulation/inject_blind_attack.py  # blind var
 ---
 
 ## Architecture
+
+<div align="center">
+  <img src="./assets/architecture.png" alt="EZEK13L architecture" width="900">
+</div>
+
+<details>
+<summary>Text version</summary>
 
 ```
   TRAFFIC
@@ -165,7 +222,16 @@ docker compose run --rm py python simulation/inject_blind_attack.py  # blind var
   BLIND_TEST_RESULTS.md         generalization test results
 ```
 
+</details>
+
 ### Network topology
+
+<div align="center">
+  <img src="./assets/topology.png" alt="Network topology" width="800">
+</div>
+
+<details>
+<summary>Text version</summary>
 
 ```
 192.168.50.0/24
@@ -180,7 +246,7 @@ docker compose run --rm py python simulation/inject_blind_attack.py  # blind var
 172.16.0.50    blind_attacker  (blind test — never seen during training)
 ```
 
-[IMAGE: clean network topology diagram — dark background, fine lines, node icons for each host, gold accent on the attacker nodes]
+</details>
 
 ---
 
@@ -249,7 +315,6 @@ Five synthetic attack types, two generators.
 
 The standard validation trains and evaluates on the same generator — it measures in-distribution accuracy, not generalisation. To stress-test the model, a second generator was built with entirely different parameters. The model was not retrained.
 
-[IMAGE: side-by-side comparison of VALIDACION_POC.md and BLIND_TEST_RESULTS.md tables — dark background, gold table borders]
 
 ### Parameter delta
 
@@ -297,6 +362,9 @@ Temporal 60s+300s   error ratio · unique IP/port ratio · bytes per conn · POS
 
 ## Repository structure
 
+<details>
+<summary>View repository tree</summary>
+
 ```
 lab-ndr/
 ├── simulation/
@@ -334,6 +402,8 @@ lab-ndr/
 └── BLIND_TEST_RESULTS.md
 ```
 
+</details>
+
 ---
 
 ## Limitations
@@ -350,24 +420,36 @@ lab-ndr/
 
 ---
 
-## What comes next
+## Roadmap
 
-**Evaluate against a public dataset** — CICIDS2017 or UNSW-NB15. First honest out-of-distribution measurement.
-
-**Expand data exfiltration training** — From 12 to 200+ varied instances. Should push recall from 75% to 95%+ and remove the heuristic dependency.
-
-**Adversarial generator variants** — Slow port scans, low-entropy DNS exfil, traffic mimicry. Quantify the evasion surface.
-
-**Layer attribution report** — Measure what each layer catches independently to make the multi-layer value concrete.
+- [ ] Evaluate against CICIDS2017 or UNSW-NB15 — first honest out-of-distribution measurement
+- [ ] Expand data exfiltration training from 12 to 200+ varied instances
+- [ ] Add adversarial generator variants — slow scans, low-entropy DNS exfil, traffic mimicry
+- [ ] Build layer attribution report — measure what each layer catches independently
+- [ ] Add dashboard view for live scores
 
 ---
 
 ## Summary
 
-EZEK13L detects what it was built to detect — and the blind test shows it learned behaviour, not parameters. The data exfiltration gap is real and documented. Everything else passed.
+EZEK13L detects what it was built to detect — and the blind test shows it learned behaviour, not parameters.
 
-It is a lab. A well-built one.
+The data exfiltration gap is real, documented, and covered by heuristics.
+
+> It is a lab.  
 
 ---
 
-*Suricata · Zeek · River · Scapy · Docker*
+<div align="center">
+
+**Suricata · Zeek · River · Scapy · Docker**
+
+</div>
+
+---
+
+<div align="center">
+
+<sub><i>Ezekiel 33:7 — But I have appointed you, son of man, to be a watchman for the house...</i></sub>
+
+</div>
