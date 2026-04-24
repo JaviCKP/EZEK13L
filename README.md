@@ -2,49 +2,43 @@
 
 **Network Detection & Response — Local Lab**
 
-Multi-layer attack detection on synthetic network traffic. Combines Suricata, Zeek, unsupervised anomaly detection, and a supervised attack classifier. Runs entirely in Docker.
+> A proof-of-concept. Synthetic traffic, virtual hosts, no production claims.  
+> What it does demonstrate: a multi-layer detection architecture that reads behaviour, not just signatures.
 
-> Proof-of-concept. Synthetic traffic, virtual hosts, no production claims.
-
-[IMAGE: dark terminal screenshot showing the blind test — five PASS lines in sequence, monospace font on black background]
+[IMAGE: dark terminal screenshot showing the blind test output — all five PASS lines in sequence, clean monospace font on black background]
 
 ---
 
 ## Table of contents
 
-- [What it is](#what-it-is)
+- [The idea](#the-idea)
 - [How it looks](#how-it-looks)
 - [Installation](#installation)
 - [Usage](#usage)
-- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Detection layers](#detection-layers)
+- [Attack families](#attack-families)
 - [Blind Generalization Test](#blind-generalization-test)
+- [Feature engineering](#feature-engineering)
+- [Repository structure](#repository-structure)
 - [Limitations](#limitations)
 - [What comes next](#what-comes-next)
 
 ---
 
-## What it is
+## The idea
 
-A local NDR lab that detects five attack families across four independent detection layers:
+Most IDS demos stop at Suricata firing on a known payload. EZEK13L goes one layer deeper.
 
-| Layer | Technology | What it catches |
-|---|---|---|
-| 1 | HalfSpaceTrees (unsupervised) | Statistical anomalies vs. normal baseline |
-| 2 | CentroidAttackClassifier (supervised) | Known attack families by behaviour profile |
-| 3 | Expert signals (heuristics) | Scan pressure, DNS entropy, HTTP shape, volume spikes |
-| 4 | Suricata (signatures) | Known payloads via community ruleset |
+It combines signature detection (Suricata), unsupervised anomaly scoring (HalfSpaceTrees), supervised attack classification (centroid-based), and hand-tuned behavioural heuristics — four layers that compensate for each other's blind spots. When one layer misses, another doesn't.
 
-When one layer misses, another covers. The blind test at the end of this document shows that in practice.
-
-**Attack families detected:** Port Scan · DNS Exfiltration · Brute Force HTTP · SQL Injection · Data Exfiltration
+The blind generalization test at the end of this document shows what that means in practice.
 
 ---
 
 ## How it looks
 
-[IMAGE: side-by-side of VALIDACION_POC.md and BLIND_TEST_RESULTS.md tables — same 5 attacks, both sets PASS]
-
-Standard validation output (`VALIDACION_POC.md`):
+Standard validation (`VALIDACION_POC.md`):
 
 ```
 [PASS] Control benigno    raw=0.920  detections=0   layers=—
@@ -55,7 +49,7 @@ Standard validation output (`VALIDACION_POC.md`):
 [FAIL] Data Exfiltration  raw=0.752  detections=0   layers=Expert
 ```
 
-Blind test output — different IPs, domains, and payloads, model not retrained (`BLIND_TEST_RESULTS.md`):
+Blind test — different IPs, domains, and payloads, model not retrained (`BLIND_TEST_RESULTS.md`):
 
 ```
 [PASS] Control benigno       raw=0.920  detections=0   layers=—
@@ -68,7 +62,7 @@ Blind test output — different IPs, domains, and payloads, model not retrained 
 Blind result: 5/5 attacks detected
 ```
 
-[IMAGE: actual terminal screenshot of validate-blind.ps1 running — full output visible]
+[IMAGE: actual terminal screenshot of validate-blind.ps1 output — monospace, dark background, each PASS line visible]
 
 ---
 
@@ -82,18 +76,18 @@ cd EZEK13L
 .\scripts\poc-train.ps1
 ```
 
-`poc-train.ps1` generates synthetic traffic, processes it through Zeek, extracts features, and trains both models. Output goes to `model/`.
+`poc-train.ps1` generates synthetic traffic, runs it through Zeek, extracts features, and trains both models. Output goes to `model/`.
 
 ---
 
 ## Usage
 
-**Run the full validation matrix**
+**Standard validation**
 ```powershell
 .\scripts\validate-poc.ps1
 ```
 
-**Run the blind generalization test** (different IPs, domains, payloads — no retraining)
+**Blind generalization test** (different IPs, domains, payloads — model not retrained)
 ```powershell
 .\scripts\validate-blind.ps1
 ```
@@ -109,69 +103,102 @@ docker compose run --rm py python simulation/inject_attack.py        # standard
 docker compose run --rm py python simulation/inject_blind_attack.py  # blind variants
 ```
 
-**Strict ML-only validation** (Suricata and heuristics don't count as PASS)
+**Strict ML-only mode** (Suricata and heuristics don't count as PASS)
 ```powershell
 .\scripts\validate-poc.ps1 -RequireMl
 ```
 
 ---
 
-## How it works
-
-### Pipeline
+## Architecture
 
 ```
-  TRAFFIC GENERATION
-  simulation/generate_normal.py     benign: admin · dev · RRHH hosts
-  simulation/inject_attack.py       5 attack families · 2 generators
+  TRAFFIC
+  ───────
+  simulation/generate_normal.py        simulation/inject_attack.py
+  benign: admin · dev · RRHH hosts     5 attack families · 2 generators
 
-          │ .pcap
+          │
+          │  .pcap
           ▼
 
   PROCESSING
-  Zeek  →  conn.log · http.log · dns.log · tls.log
-  Suricata  →  eve.json (alerts)
+  ──────────
+  ┌─────────────┐    ┌──────────────┐
+  │    Zeek     │    │   Suricata   │
+  │  conn.log   │    │  eve.json    │
+  │  http.log   │    │  (alerts)    │
+  │  dns.log    │    └──────────────┘
+  │  tls.log    │
+  └─────────────┘
 
-          │ 152 features / flow
+          │
+          │  152 features / flow
           ▼
 
-  SCORING  (pipeline/score.py)
-  ┌─────────────────────────────────────────┐
-  │  Layer 1 — HalfSpaceTrees baseline      │  raw_score vs threshold 0.95
-  ├─────────────────────────────────────────┤
-  │  Layer 2 — CentroidAttackClassifier     │  6 classes · confidence ≥ 0.45
-  ├─────────────────────────────────────────┤
-  │  Layer 3 — Expert signals               │  behavioral_boost + factors
-  ├─────────────────────────────────────────┤
-  │  Layer 4 — Suricata correlation         │  cross-reference by IP + flow
-  └─────────────────────────────────────────┘
+  SCORING                                              pipeline/score.py
+  ───────
+  ┌──────────────────────────────────────────────┐
+  │  Layer 1 — Baseline anomaly (unsupervised)   │
+  │  MinMaxScaler + HalfSpaceTrees               │
+  │  threshold 0.95 · 99 ratio/shape features    │
+  ├──────────────────────────────────────────────┤
+  │  Layer 2 — Attack classifier (supervised)    │
+  │  CentroidAttackClassifier · 6 classes        │
+  │  confidence threshold 0.45                   │
+  ├──────────────────────────────────────────────┤
+  │  Layer 3 — Expert signals (heuristics)       │
+  │  scan pressure · DNS entropy                 │
+  │  HTTP shape · volume spike                   │
+  ├──────────────────────────────────────────────┤
+  │  Layer 4 — Suricata correlation              │
+  │  alert cross-reference by IP + flow          │
+  └──────────────────────────────────────────────┘
 
           │
           ▼
-  output/live_scores.jsonl   ·   VALIDACION_POC.md   ·   BLIND_TEST_RESULTS.md
+
+  OUTPUT
+  ──────
+  output/live_scores.jsonl      per-flow scores + labels + audit
+  VALIDACION_POC.md             standard validation matrix
+  BLIND_TEST_RESULTS.md         generalization test results
 ```
 
 ### Network topology
 
 ```
 192.168.50.0/24
-  ├── .10   pc_admin    web browsing, report downloads
-  ├── .11   pc_dev      API calls, TLS, DNS
-  ├── .12   pc_rrhh     file shares, uploads
-  ├── .1    srv_web     internal web/API server (attack target)
-  └── .2    srv_dns     DNS resolver
+  ├── .10   pc_admin      web browsing, report downloads
+  ├── .11   pc_dev        API calls, TLS, DNS
+  ├── .12   pc_rrhh       file shares, uploads
+  ├── .1    srv_web       internal web/API server
+  ├── .2    srv_dns       DNS resolver
+  └── .254  gateway       TLS egress
 
-10.0.0.99    attacker        standard attacks
-172.16.0.50  blind_attacker  blind test (never seen during training)
+10.0.0.99      attacker        (standard attacks)
+172.16.0.50    blind_attacker  (blind test — never seen during training)
 ```
 
-### Models
+[IMAGE: clean network topology diagram — dark background, fine lines, node icons for each host, gold accent on the attacker nodes]
 
-**Baseline — HalfSpaceTrees** (unsupervised)
-Trained on 8 979 normal traffic events. Uses ratio features (`error_ratio_60s`) instead of raw counters to avoid environment-specific overfitting. Threshold: 0.95 (99.9th percentile of holdout). Online learning is blocked on any flow that scores above 0.75, triggers Suricata, or is classified as an attack — anti-poisoning by design.
+---
 
-**Classifier — CentroidAttackClassifier** (supervised)
-Centroid k-NN with softmax temperature scaling (T=0.35). Trained on 2 460 labelled synthetic events.
+## Detection layers
+
+### Layer 1 — Unsupervised baseline
+
+Algorithm: `river.anomaly.HalfSpaceTrees` (50 trees · height 10 · window 512)  
+Trained on 8 979 events of normal traffic. Threshold: **0.95** (99.9th percentile of calibration holdout).
+
+Features use **ratios instead of raw counters** (`error_ratio_60s` rather than `failed_conn_count_60s`) so the model is not thrown off by volume differences between environments.
+
+Online learning is blocked when a flow scores above 0.75, when Suricata alerts on it, or when the classifier already flagged it — anti-poisoning by design.
+
+### Layer 2 — Supervised classifier
+
+Algorithm: `CentroidAttackClassifier` — centroid k-NN with softmax temperature scaling (T=0.35)  
+Trained on 2 460 labelled synthetic events across 6 classes.
 
 | Class | Train samples | Test F1 |
 |---|---:|---:|
@@ -182,45 +209,164 @@ Centroid k-NN with softmax temperature scaling (T=0.35). Trained on 2 460 labell
 | sql_injection | 117 | 1.000 |
 | data_exfiltration | 12 | 0.857 |
 
+These metrics are on synthetic in-distribution test data. The [blind test](#blind-generalization-test) is the more honest number.
+
+### Layer 3 — Expert signals
+
+Four behavioural detectors that run independent of ML scores and produce an auditable `behavioral_factors` label:
+
+| Signal | Condition |
+|---|---|
+| `scan_ports_60s` / `scan_ports_300s` | 8+ unique destination ports · 4+ failures in 60 s |
+| `dns_query_shape` / `dns_nxdomain` | NXDOMAIN responses + query entropy > 4.1 |
+| `http_payload_shape` / `http_error_response` | URI entropy > 4.8 or query string > 80 chars |
+| `volume_spike` | Single flow > 500 KB or source total > 1 MB in 300 s |
+
+### Layer 4 — Suricata correlation
+
+Standard community ruleset. Alerts from `eve.json` are cross-referenced by IP and flow. A Suricata detection permanently blocks online learning on that IP/flow.
+
+---
+
+## Attack families
+
+Five synthetic attack types, two generators.
+
+| # | Family | Technique |
+|---|---|---|
+| 1 | Port Scan | SYN scan · RST-ACK responses · sequential or service ports |
+| 2 | DNS Exfiltration | High-entropy subdomain labels · NXDOMAIN responses |
+| 3 | Brute Force HTTP | Rapid POST · 401 responses · repeated auth attempts |
+| 4 | SQL Injection | GET with embedded SQL payloads · UNION / WAITFOR / CAST |
+| 5 | Data Exfiltration | Large POST body · single flow or repeated chunks |
+
+`simulation/common.py` — standard generator (training parameters)  
+`simulation/blind_attacks.py` — blind generator (disjoint parameters, never seen during training)
+
 ---
 
 ## Blind Generalization Test
 
-The standard validation trains and tests on the same generator. To check whether the model learned attack *behaviour* or just attack *parameters*, a second generator was built with entirely different characteristics — and the model was not retrained.
+The standard validation trains and evaluates on the same generator — it measures in-distribution accuracy, not generalisation. To stress-test the model, a second generator was built with entirely different parameters. The model was not retrained.
 
-| Parameter | Standard | Blind |
+[IMAGE: side-by-side comparison of VALIDACION_POC.md and BLIND_TEST_RESULTS.md tables — dark background, gold table borders]
+
+### Parameter delta
+
+| Parameter | Standard (training) | Blind (unseen) |
 |---|---|---|
 | Attacker IP | `10.0.0.99` | `172.16.0.50` |
-| Port scan | Ports 20–99, sequential | Windows service ports: 135, 445, 1433, 3389… |
+| Port scan range | Ports 20–99, sequential | Windows service ports: 135, 139, 445, 1433, 3389, 5432 … |
 | DNS C2 domain | `*.evil-c2.com` | `*.cdn-update.net` |
+| DNS label length | 18 + 18 + 14 chars | 12 + 12 chars |
 | Brute force endpoint | `POST /login` | `POST /api/auth/token` |
-| SQL payloads | UNION · OR 1=1 · sleep() | WAITFOR · xp_cmdshell · CAST · DROP TABLE |
-| Data exfil | Single POST 650 KB–3 MB | 3–6 chunks of 100–400 KB |
+| Brute force body | `username=admin&password=…` | `{"user":"svc","secret":"…"}` |
+| SQL payloads | UNION SELECT · OR 1=1 · sleep() | WAITFOR DELAY · xp_cmdshell · CAST · DROP TABLE |
+| Data exfil | Single POST 650 KB – 3 MB to `/sync` | 3–6 chunks of 100–400 KB to `/api/v2/upload` |
 
-Result: **5/5 families detected.** Each through a different layer combination — which is the point of the multi-layer design.
+### What the results show
 
-The one honest weak spot: Data Exfiltration is caught by the volume spike heuristic, not by the classifier. The classifier has 12 training examples for that class. It's documented, not hidden.
+Each attack was caught by a different combination of layers. That is the point.
+
+**Port Scan** — ML + Expert + Suricata. SYN scan behaviour is structurally the same regardless of which ports are targeted. All three layers fire independently.
+
+**DNS Exfiltration** — ML + Expert, no Suricata. The community ruleset has no signature for `cdn-update.net`. The classifier catches it through DNS shape features: entropy, NXDOMAIN ratio, rejected query rate. A domain the model has never seen, detected by behaviour alone.
+
+**Brute Force HTTP** — ML + Suricata, no expert signal. The heuristic watches `/login`; `/api/auth/token` does not trigger it. The classifier catches the pattern through POST error rate and connection frequency in the 60 s window.
+
+**SQL Injection** — ML + Expert + Suricata. MSSQL-style payloads are syntactically different from training payloads but share the same feature signature: long URIs, high character entropy, special characters. Shape is invariant to specific keywords.
+
+**Data Exfiltration** — Expert signal only. The classifier does not fire — same as in the standard validation. Twelve training examples is not enough. The volume spike heuristic covers it. This is the honest weak spot.
+
+---
+
+## Feature engineering
+
+`pipeline/build_features.py` extracts 152 features per flow. The baseline model uses 99 (ratios and shape only — raw volume counts excluded to avoid environment-specific overfitting).
+
+```
+Base (per flow)     duration · bytes/packet ratios · protocol flags · connection state flags
+HTTP                URI entropy · query length · special chars · status code flags · body size
+DNS                 query entropy · label count · NXDOMAIN flag · answer count · rejected flag
+TLS                 SNI length · version flags · resumed · established
+Temporal 60s+300s   error ratio · unique IP/port ratio · bytes per conn · POST ratio ·
+                    POST error ratio — per source and per src-dst pair
+```
+
+---
+
+## Repository structure
+
+```
+lab-ndr/
+├── simulation/
+│   ├── common.py                    packet builders — normal + standard attacks
+│   ├── blind_attacks.py             blind test generators (disjoint parameters)
+│   ├── generate_normal.py           normal traffic wrapper
+│   ├── generate_attack_train.py     labelled attack PCAP generator
+│   ├── inject_attack.py             manual injector (standard)
+│   └── inject_blind_attack.py       manual injector (blind)
+│
+├── pipeline/
+│   ├── build_features.py            Zeek logs → 152-feature JSONL
+│   ├── train_baseline.py            HalfSpaceTrees training
+│   ├── train_attack_classifier.py   CentroidAttackClassifier training
+│   ├── score.py                     online scoring + learning control
+│   ├── attack_classifier.py         classifier implementation
+│   ├── feature_selection.py         baseline feature filter (99 of 152)
+│   ├── anomaly_utils.py             expert signal heuristics
+│   └── suricata_utils.py            Suricata alert classification
+│
+├── scripts/
+│   ├── poc-train.ps1                full training pipeline
+│   ├── validate-poc.ps1             standard validation matrix
+│   ├── validate-blind.ps1           blind generalization test
+│   ├── poc-live.ps1                 live processing loop
+│   ├── poc-watcher.ps1              single PCAP processor
+│   ├── demo-jefe.ps1                90-second demo
+│   └── clean-repo.ps1               artifact cleanup
+│
+├── model/
+│   └── MODEL_CARD.md                model transparency document
+│
+├── suricata/etc/                    Suricata config + local rules
+├── VALIDACION_POC.md
+└── BLIND_TEST_RESULTS.md
+```
 
 ---
 
 ## Limitations
 
-- **Synthetic data throughout.** The 99.76% classifier accuracy measures the generator, not the real problem. The blind test is more honest, but still synthetic.
-- **Data exfiltration is undertrained.** 12 examples. Needs 200+.
-- **No evaluation against real traffic.** Not tested against CICIDS2017, UNSW-NB15, or any captured corpus.
-- **Three-host baseline.** The 0.95 threshold reflects a quiet lab network. A real network needs recalibration.
+**Synthetic data, synthetic evaluation.** The 99.76% classifier accuracy is a measurement of the generator, not of the problem. The blind test is more honest, but it is still synthetic traffic.
+
+**Data exfiltration is undertrained.** Twelve training examples. The blind test confirms it: this family is saved by heuristics, not by the classifier.
+
+**Expert signal thresholds were tuned on the training generator.** They generalise to structurally similar variants, but were not derived from literature or real-world traffic analysis.
+
+**No out-of-distribution evaluation.** The model has not been tested against CICIDS2017, UNSW-NB15, or any real captured traffic corpus.
+
+**Trained on a three-host network.** The 0.95 anomaly threshold reflects that quiet environment. A real network would require recalibration.
 
 ---
 
 ## What comes next
 
-**Evaluate against CICIDS2017 or UNSW-NB15** — first honest out-of-distribution measurement.
+**Evaluate against a public dataset** — CICIDS2017 or UNSW-NB15. First honest out-of-distribution measurement.
 
-**Expand data exfiltration training** — 12 → 200+ varied instances to remove the heuristic dependency.
+**Expand data exfiltration training** — From 12 to 200+ varied instances. Should push recall from 75% to 95%+ and remove the heuristic dependency.
 
-**Adversarial variants** — slow scans, low-entropy DNS exfil, traffic mimicry. Quantify the evasion surface.
+**Adversarial generator variants** — Slow port scans, low-entropy DNS exfil, traffic mimicry. Quantify the evasion surface.
 
-**Layer attribution report** — measure what each layer catches independently to make the multi-layer value concrete.
+**Layer attribution report** — Measure what each layer catches independently to make the multi-layer value concrete.
+
+---
+
+## Summary
+
+EZEK13L detects what it was built to detect — and the blind test shows it learned behaviour, not parameters. The data exfiltration gap is real and documented. Everything else passed.
+
+It is a lab. A well-built one.
 
 ---
 
