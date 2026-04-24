@@ -27,5 +27,15 @@ suricata/lib/rules/*
 
 model/*.pkl
 model/meta*.json
+model/*_meta.json
 model/*.bak
 model/*.tmp
+
+dashboard/
+
+scripts/run-dashboard.ps1
+
+ANALISIS_*.md
+AUDITORIA_REPO.md
+PLAN_RESCATE_POC.md
+REVISION_OBJETIVA.md
