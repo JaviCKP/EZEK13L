@@ -9,6 +9,23 @@
 
 ---
 
+## Table of contents
+
+- [The idea](#the-idea)
+- [Architecture](#architecture)
+- [Network topology](#network-topology)
+- [Detection layers](#detection-layers)
+- [Attack families](#attack-families)
+- [Prerequisites](#prerequisites)
+- [Usage](#usage)
+- [Blind Generalization Test](#blind-generalization-test)
+- [Feature engineering](#feature-engineering)
+- [Repository structure](#repository-structure)
+- [Limitations](#limitations)
+- [What comes next](#what-comes-next)
+
+---
+
 ## The idea
 
 Most IDS demos stop at Suricata firing on a known payload. EZEK13L goes one layer deeper.
