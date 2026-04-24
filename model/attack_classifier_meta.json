@@ -1,0 +1,119 @@
+{
+  "model": {
+    "type": "CentroidAttackClassifier",
+    "library": "local",
+    "temperature": 0.35,
+    "seed": 42
+  },
+  "labels": [
+    "brute_force_http",
+    "data_exfiltration",
+    "dns_exfiltration",
+    "normal",
+    "port_scan",
+    "sql_injection"
+  ],
+  "normal_label": "normal",
+  "detection_threshold": 0.45,
+  "class_thresholds": {
+    "brute_force_http": 0.45,
+    "data_exfiltration": 0.45,
+    "dns_exfiltration": 0.45,
+    "port_scan": 0.45,
+    "sql_injection": 0.45
+  },
+  "threshold_calibration": {
+    "strategy": "per_class_holdout_confidence",
+    "quantile": 0.1,
+    "margin": 0.05,
+    "min_threshold": 0.2,
+    "global_threshold": 0.45,
+    "calibration_rows": 819
+  },
+  "rows": 3279,
+  "train_rows": 2460,
+  "test_rows": 819,
+  "class_counts": {
+    "brute_force_http": 421,
+    "data_exfiltration": 12,
+    "dns_exfiltration": 286,
+    "normal": 1800,
+    "port_scan": 643,
+    "sql_injection": 117
+  },
+  "metrics": {
+    "labels": [
+      "brute_force_http",
+      "data_exfiltration",
+      "dns_exfiltration",
+      "normal",
+      "port_scan",
+      "sql_injection"
+    ],
+    "accuracy": 0.9975579975579976,
+    "macro_precision": 0.9973236522856913,
+    "macro_recall": 0.9579718004338394,
+    "macro_f1": 0.9746634421254812,
+    "confusion": {
+      "brute_force_http": {
+        "brute_force_http": 94
+      },
+      "data_exfiltration": {
+        "data_exfiltration": 3,
+        "normal": 1
+      },
+      "dns_exfiltration": {
+        "dns_exfiltration": 71
+      },
+      "normal": {
+        "normal": 460,
+        "dns_exfiltration": 1
+      },
+      "port_scan": {
+        "port_scan": 171
+      },
+      "sql_injection": {
+        "sql_injection": 18
+      }
+    },
+    "per_class": {
+      "brute_force_http": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 94
+      },
+      "data_exfiltration": {
+        "precision": 1.0,
+        "recall": 0.75,
+        "f1": 0.8571428571428571,
+        "support": 4
+      },
+      "dns_exfiltration": {
+        "precision": 0.9861111111111112,
+        "recall": 1.0,
+        "f1": 0.993006993006993,
+        "support": 71
+      },
+      "normal": {
+        "precision": 0.9978308026030369,
+        "recall": 0.9978308026030369,
+        "f1": 0.9978308026030369,
+        "support": 461
+      },
+      "port_scan": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 171
+      },
+      "sql_injection": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 18
+      }
+    }
+  },
+  "created_at_utc": "2026-04-24T14:45:43.113422+00:00"
+}

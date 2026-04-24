@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EZEK13L | Sentinel Drift</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jura:wght@300;400;500;600;700&family=Montserrat:wght@100;200;300;400&family=JetBrains+Mono:wght@100;200;300;400&display=swap" rel="stylesheet">
+    
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Logo Header -->
+        <header class="hero">
+            <div class="logo-container">
+                <svg width="120" height="120" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <style>
+                        .line { stroke: #C5A059; stroke-width: 1.5; fill: none; }
+                        .dot { fill: #C5A059; }
+                    </style>
+                    <!-- Center vertical line -->
+                    <line x1="100" y1="20" x2="100" y2="180" class="line" />
+                    <!-- Left and right horizontal lines -->
+                    <line x1="10" y1="100" x2="40" y2="100" class="line" />
+                    <line x1="160" y1="100" x2="190" y2="100" class="line" />
+                    <!-- Diamond -->
+                    <polygon points="100,50 150,100 100,150 50,100" class="line" />
+                    <!-- Circle inside -->
+                    <circle cx="100" cy="100" r="35" class="line" />
+                    <!-- Chevrons -->
+                    <polyline points="75,55 100,30 125,55" class="line" />
+                    <polyline points="75,145 100,170 125,145" class="line" />
+                    <!-- Dots -->
+                    <circle cx="100" cy="10" r="4" class="dot" />
+                    <circle cx="100" cy="190" r="4" class="dot" />
+                    <circle cx="50" cy="100" r="4" class="dot" />
+                    <circle cx="150" cy="100" r="4" class="dot" />
+                    <circle cx="100" cy="100" r="6" class="dot" />
+                </svg>
+            </div>
+            <h1 class="logo-text">E Z E K 1 <span class="gold-text">3</span> L</h1>
+            <p class="subtitle">S E N T I N E L &nbsp;&nbsp; D R I F T</p>
+            
+            <div class="pipeline-status" id="pipeline-status">
+                <!-- Status chips will be injected here -->
+            </div>
+        </header>
+
+        <!-- Metrics Row -->
+        <section class="metrics-grid" id="metrics-grid">
+            <!-- Metrics will be injected here -->
+        </section>
+
+        <!-- Main Charts Row -->
+        <section class="charts-row">
+            <div class="panel col-span-2">
+                <div class="panel-header">RADAR DE DETECCION</div>
+                <div class="panel-content">
+                    <div id="timeline-chart" style="width:100%;height:300px;"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">ESTADO COMBINADO</div>
+                <div class="panel-content">
+                    <div id="status-chart" style="width:100%;height:300px;"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tables Row -->
+        <section class="charts-row">
+            <div class="panel col-span-2">
+                <div class="panel-header">EVENTOS PRIORIZADOS</div>
+                <div class="panel-content table-container">
+                    <table id="events-table">
+                        <thead>
+                            <tr>
+                                <th>HORA</th>
+                                <th>ESTADO</th>
+                                <th>SRC</th>
+                                <th>DST</th>
+                                <th>PUERTO</th>
+                                <th>ETIQUETA ML</th>
+                                <th>CONF</th>
+                                <th>RAREZA</th>
+                                <th>HIBRIDO</th>
+                                <th>EXPERT</th>
+                                <th>PORQUE</th>
+                                <th>SURICATA</th>
+                                <th>FIRMA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">SUPERFICIE UTIL</div>
+                <div class="panel-content">
+                    <div class="sub-panel">
+                        <div class="sub-header">TOP ORIGEN/DESTINO</div>
+                        <table id="top-ips-table" class="small-table">
+                            <thead><tr><th>IP</th><th>ALERTAS</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="sub-panel" style="margin-top:1.5rem;">
+                        <div class="sub-header">TOP FIRMAS</div>
+                        <table id="top-sigs-table" class="small-table">
+                            <thead><tr><th>FIRMA</th><th>HITS</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- JS -->
+    <script src="/static/script.js"></script>
+</body>
+</html>

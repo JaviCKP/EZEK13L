@@ -1,0 +1,42 @@
+services:
+  py:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./model:/app/model
+      - ./output:/app/output
+      - ./pipeline:/app/pipeline
+      - ./simulation:/app/simulation
+      - ./dashboard:/app/dashboard
+    working_dir: /app
+    entrypoint: ["python"]
+
+  dashboard:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./model:/app/model
+      - ./output:/app/output
+      - ./pipeline:/app/pipeline
+      - ./simulation:/app/simulation
+      - ./dashboard:/app/dashboard
+    working_dir: /app
+    command: uvicorn api:app --app-dir /app/dashboard --host 0.0.0.0 --port 8501 --reload
+    ports:
+      - "8501:8501"
+
+  zeek:
+    image: zeek/zeek:lts
+    volumes:
+      - ./data:/data
+      - ./logs:/logs
+
+  suricata:
+    image: jasonish/suricata:latest
+    volumes:
+      - ./data:/data
+      - ./logs:/logs
+      - ./suricata/etc:/etc/suricata
+      - ./suricata/lib:/var/lib/suricata

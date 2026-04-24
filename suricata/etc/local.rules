@@ -1,0 +1,20 @@
+# Local lab rules for the synthetic PoC.
+# Full community rules should be installed with scripts/update-suricata-rules.ps1.
+
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB login POST burst"; flow:established,to_server; http.method; content:"POST"; http.uri; content:"login"; nocase; threshold:type threshold, track by_src, count 10, seconds 300; classtype:web-application-attack; sid:1001001; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible SQL injection UNION"; flow:established,to_server; http.uri; content:"union"; nocase; classtype:web-application-attack; sid:1001101; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible SQL injection SELECT"; flow:established,to_server; http.uri; content:"select"; nocase; classtype:web-application-attack; sid:1001102; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible SQL injection information_schema"; flow:established,to_server; http.uri; content:"information_schema"; nocase; classtype:web-application-attack; sid:1001103; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible SQL injection time delay"; flow:established,to_server; http.uri; content:"sleep("; nocase; classtype:web-application-attack; sid:1001104; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible XSS script tag"; flow:established,to_server; http.uri; content:"script"; nocase; classtype:web-application-attack; sid:1001201; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible XSS javascript URI"; flow:established,to_server; http.uri; content:"javascript:"; nocase; classtype:web-application-attack; sid:1001202; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB possible XSS event handler"; flow:established,to_server; http.uri; content:"onerror"; nocase; classtype:web-application-attack; sid:1001203; rev:1;)
+alert http any any -> $HTTP_SERVERS any (msg:"LOCAL WEB suspicious encoded request"; flow:established,to_server; http.uri; content:"%"; nocase; threshold:type threshold, track by_src, count 20, seconds 300; classtype:web-application-attack; sid:1001301; rev:1;)
+
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"LOCAL TLS Dropbox observed"; flow:established,to_server; tls.sni; content:"dropbox"; nocase; classtype:policy-violation; sid:1002001; rev:1;)
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"LOCAL HTTP Dropbox observed"; flow:established,to_server; http.host; content:"dropbox"; classtype:policy-violation; sid:1002002; rev:1;)
+
+alert tcp any any -> $HOME_NET any (msg:"LOCAL Possible SYN scan"; flags:S; threshold:type both, track by_src, count 15, seconds 60; classtype:attempted-recon; sid:1003001; rev:1;)
+alert icmp any any -> $HOME_NET any (msg:"LOCAL Possible ICMP sweep"; itype:8; threshold:type both, track by_src, count 20, seconds 60; classtype:attempted-recon; sid:1003002; rev:1;)
+
+alert tcp any any -> $HOME_NET any (msg:"LOCAL Metasploit marker"; flow:established; content:"meterpreter"; nocase; classtype:trojan-activity; sid:1004001; rev:1;)
